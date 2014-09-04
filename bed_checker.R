@@ -1,0 +1,96 @@
+
+library(snpStats, quietly=TRUE)
+
+verbose <- TRUE
+
+args.orig <- commandArgs(trailingOnly=TRUE)
+
+if ('--noprompt' %in% args.orig) {
+    verbose <- FALSE
+    args.orig <- setdiff(args.orig, '--noprompt')
+}
+
+if (length(args.orig) != 2) {
+    stop("Usage: Rscript bed_checker.R genotype.file bed.file")
+}
+
+genotype.file <- args.orig[1]
+bed.file <- args.orig[2]
+
+bed.file <- gsub('.bed$', '', bed.file)
+
+cat(paste0("Genotype file is :", genotype.file, "\n"))
+cat(paste0("Bed file is :", bed.file, ".bed\n"))
+
+if (verbose) {
+    cat("Continue (Y/N)? ")
+    resp <- readLines(con="stdin", 1)
+
+    if (toupper(resp)!='Y') {
+        q()
+    }
+}
+
+cat("\n\nRandomly select 20 SNPs to check.\n")
+
+genotype.data <- read.delim(genotype.file, stringsAsFactors=FALSE, header=FALSE, nrow=3, skip=1)
+
+genotype.colnames <- scan(genotype.file, what='character', nline=1, quiet=TRUE)
+if (ncol(genotype.data)==(length(genotype.colnames))) {
+    names(genotype.data) <-  genotype.colnames
+} else {
+    if (ncol(genotype.data)==(length(genotype.colnames)+1)) {
+        names(genotype.data) <- c('snpid', genotype.colnames)
+    } else {
+        print(genotype.colnames)
+        stop("Colnames do not fit...")
+    }
+}
+
+## one character one byte
+title.offset <- (sum(nchar(names(genotype.data))) + ncol(genotype.data))
+row.size <- sum(nchar(unlist(genotype.data[1,]))) + ncol(genotype.data)
+
+genotype.filesize <- file.info(genotype.file)$size[1]
+sample.pos <- sample(title.offset:(genotype.filesize-row.size*2), 20)
+
+genotype.bf <- file(genotype.file, 'rb')
+
+for (curr.pos in sample.pos) {
+    seek(genotype.bf, curr.pos)
+
+    temp <- unlist(strsplit(readChar(genotype.bf, row.size * 3), "\n"))
+    if (length(temp) > 2) {
+        genotype.data <- rbind(genotype.data, unlist(strsplit(temp[2], '\t')))
+    }
+}
+
+close(genotype.bf)
+
+row.names(genotype.data) <- genotype.data[,1]
+genotype.data <- genotype.data[,-1]
+
+genotype.data <- genotype.data[order(row.names(genotype.data)),]
+
+cat("Retrieving data from plink bed file...\n")
+
+plink.genotype <- read.plink(bed.file, select.snps=row.names(genotype.data))
+
+plink.genotype <- t(as(plink.genotype$genotype, 'character'))
+
+plink.genotype <- plink.genotype[order(row.names(plink.genotype)),]
+
+cat("\nCheck all snps are retrieved....\n")
+all(row.names(plink.genotype)==row.names(genotype.data))
+
+cat("\nCheck all samples are retrieved....\n")
+all(colnames(plink.genotype)==names(genotype.data))
+
+for (i in 1:nrow(genotype.data)) {
+    print(c(row.names(plink.genotype)[i], row.names(genotype.data)[i]))
+    print(table(unlist(plink.genotype[i,]), unlist(genotype.data[i,])))
+}
+
+
+q()
+
