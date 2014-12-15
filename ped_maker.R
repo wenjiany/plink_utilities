@@ -44,7 +44,14 @@ if (file.exists(ped.file)) {
 }
 
 map.data <- fread(map.file, stringsAsFactors=FALSE, header=FALSE)
-setnames(map.data, c('chr', 'snpid', 'mm', 'pos'))
+
+if (ncol(map.data)==6) {
+    setnames(map.data, c('chr', 'snpid', 'mm', 'pos', 'allele1', 'allele2'))
+} else {
+    setnames(map.data, c('chr', 'snpid', 'mm', 'pos'))
+    map.data[, allele1:='A']
+    map.data[, allele2:='B']    
+}
 
 cat("\nReading in genotypes data. May take a long time for large dataset.\n")
 
@@ -76,11 +83,16 @@ if (verbose) {
     }
 }
 
+genotype.data <- subset(genotype.data, snpid %in% map.data$snpid)
+
 setkey(genotype.data, snpid)
 genotype.data <- genotype.data[map.data$snpid,]
 
 ### possible to change to ACGT based on annotation
-genotype.lookup <- c('N N', 'A A', 'A B', 'B B')
+genotype.lookup.mat <- cbind('N N', paste(map.data$allele1, map.data$allele1),
+                             paste(map.data$allele1, map.data$allele2),
+                             paste(map.data$allele2, map.data$allele2))
+## genotype.lookup <- c('N N', 'A A', 'A B', 'B B')
 
 cat("\n\nGenerating target ped file: ", ped.file, "\n")
 
@@ -95,8 +107,12 @@ for (i in 2:ncol(genotype.data)) {
     curr.genotype <- unlist(genotype.data[, i, with=FALSE])
     curr.genotype <- gsub('\\/', '', curr.genotype)
     curr.genotype[!curr.genotype %in% c('AA', 'AB', 'BB')] <- 'NoCall'
-                                   
-    new.genotype <- genotype.lookup[as.numeric(factor(curr.genotype, levels=c('NoCall', 'AA', 'AB', 'BB')))]
+
+    curr.genotype <- as.numeric(factor(curr.genotype, levels=c('NoCall', 'AA', 'AB', 'BB')))
+    
+##   new.genotype <- genotype.lookup[as.numeric(factor(curr.genotype, levels=c('NoCall', 'AA', 'AB', 'BB')))]
+
+    new.genotype <- genotype.lookup.mat[cbind(1:nrow(genotype.lookup.mat), curr.genotype)]
     
     cat(paste(c(familyid, subjectid, 0, 0, curr.sex, unlist(new.genotype)), collapse=" "), file=zz)
     cat('\n', file=zz)
@@ -109,7 +125,7 @@ cat("\n\nPed file ", ped.file, " completed\n")
 
 map.file <- gsub('.ped$', '.map', ped.file)
 cat("\nWrite map file to ", map.file, "\n")
-write.table(map.data, file=map.file, sep=" ", quote=FALSE, col.names=FALSE, row.names=FALSE)
+write.table(map.data[, 1:4, with=FALSE], file=map.file, sep=" ", quote=FALSE, col.names=FALSE, row.names=FALSE)
 
 cat("1) generate bed file\n")
 cat(paste0("plink --noweb --no-pheno --file ", genotype.file, " --out b_", genotype.file, " --make-bed --missing-genotype N\n"))
