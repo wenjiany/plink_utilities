@@ -60,6 +60,7 @@ genotype.data <- fread(genotype.file, stringsAsFactors=FALSE, skip=1, header=FAL
 genotype.colnames <- scan(genotype.file, what='character', nline=1, quiet=TRUE)
 if (ncol(genotype.data)==(length(genotype.colnames))) {
     setnames(genotype.data, genotype.colnames)
+    setnames(genotype.data, genotype.colnames[1], 'snpid')
 } else {
     if (ncol(genotype.data)==(length(genotype.colnames)+1)) {
         setnames(genotype.data, c('snpid', genotype.colnames))
