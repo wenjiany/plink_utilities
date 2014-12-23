@@ -55,9 +55,22 @@ if (ncol(map.data)==6) {
 
 cat("\nReading in genotypes data. May take a long time for large dataset.\n")
 
-genotype.data <- fread(genotype.file, stringsAsFactors=FALSE, skip=1, header=FALSE)
+n.skip <- 0
+tmp.file <- file(genotype.file)
+open(tmp.file)
+while (TRUE) {
+    tmp.line<-readLines(tmp.file, n=1)
+    if (substr(tmp.line, 1, 1)!='#') {
+        break
+    }
+    n.skip <- n.skip+1    
+}
+close(tmp.file)
 
-genotype.colnames <- scan(genotype.file, what='character', nline=1, quiet=TRUE)
+genotype.data <- fread(genotype.file, stringsAsFactors=FALSE, skip=n.skip+1, header=FALSE)
+
+genotype.colnames <- scan(genotype.file, what='character', nline=1, quiet=TRUE, skip=n.skip)
+
 if (ncol(genotype.data)==(length(genotype.colnames))) {
     setnames(genotype.data, genotype.colnames)
     setnames(genotype.data, genotype.colnames[1], 'snpid')
@@ -106,10 +119,17 @@ for (i in 2:ncol(genotype.data)) {
     curr.sex <- -9
     
     curr.genotype <- unlist(genotype.data[, i, with=FALSE])
-    curr.genotype <- gsub('\\/', '', curr.genotype)
-    curr.genotype[!curr.genotype %in% c('AA', 'AB', 'BB')] <- 'NoCall'
 
-    curr.genotype <- as.numeric(factor(curr.genotype, levels=c('NoCall', 'AA', 'AB', 'BB')))
+    if (any(curr.genotype %in% c(0, 1, 2))) {
+        curr.genotype <- as.numeric(curr.genotype)
+        curr.genotype <- curr.genotype + 2   ## AA,AB,BB==2,3,4
+        curr.genotype[is.na(curr.genotype)] <- 1  ## Nocall = 1
+    } else {
+        curr.genotype <- gsub('\\/', '', curr.genotype)
+        curr.genotype[!curr.genotype %in% c('AA', 'AB', 'BB')] <- 'NoCall'
+
+        curr.genotype <- as.numeric(factor(curr.genotype, levels=c('NoCall', 'AA', 'AB', 'BB')))
+    }
     
 ##   new.genotype <- genotype.lookup[as.numeric(factor(curr.genotype, levels=c('NoCall', 'AA', 'AB', 'BB')))]
 

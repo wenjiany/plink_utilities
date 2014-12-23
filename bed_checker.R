@@ -1,4 +1,5 @@
 
+library(data.table)
 library(snpStats, quietly=TRUE)
 
 verbose <- TRUE
@@ -18,9 +19,13 @@ genotype.file <- args.orig[1]
 bed.file <- args.orig[2]
 
 bed.file <- gsub('.bed$', '', bed.file)
+bed.file <- paste0(bed.file, '.bed')
+bim.file <- gsub('.bed$', '.bim', bed.file)
 
+cat("\n\n")
 cat(paste0("Genotype file is :", genotype.file, "\n"))
-cat(paste0("Bed file is :", bed.file, ".bed\n"))
+cat(paste0("Bed file is :", bed.file, "\n"))
+cat(paste0("Bim file is :", bim.file, "\n"))
 
 if (verbose) {
     cat("Continue (Y/N)? ")
@@ -31,11 +36,26 @@ if (verbose) {
     }
 }
 
+snp.info <- fread(bim.file)
+setnames(snp.info, c('chr', 'snpid', 'cm', 'pos', 'allele1', 'allele2'))
+setkey(snp.info, snpid)
+
 cat("\n\nRandomly select 20 SNPs to check.\n")
 
-genotype.data <- read.delim(genotype.file, stringsAsFactors=FALSE, header=FALSE, nrow=3, skip=1)
+n.skip <- 0
+tmp.file <- file(genotype.file)
+open(tmp.file)
+while (TRUE) {
+    tmp.line<-readLines(tmp.file, n=1)
+    if (substr(tmp.line, 1, 1)!='#') {
+        break
+    }
+    n.skip <- n.skip+1    
+}
+close(tmp.file)
 
-genotype.colnames <- scan(genotype.file, what='character', nline=1, quiet=TRUE)
+genotype.data <- read.delim(genotype.file, stringsAsFactors=FALSE, header=FALSE, nrow=3, skip=n.skip+1)
+genotype.colnames <- scan(genotype.file, what='character', nline=1, quiet=TRUE, skip=n.skip)
 if (ncol(genotype.data)==(length(genotype.colnames))) {
     names(genotype.data) <-  genotype.colnames
 } else {
@@ -74,9 +94,9 @@ genotype.data <- genotype.data[order(row.names(genotype.data)),]
 
 cat("Retrieving data from plink bed file...\n")
 
-plink.genotype <- read.plink(bed.file, select.snps=row.names(genotype.data))
+plink.genotype.orig <- read.plink(bed.file, select.snps=row.names(genotype.data))
 
-plink.genotype <- t(as(plink.genotype$genotype, 'character'))
+plink.genotype <- t(as(plink.genotype.orig$genotype, 'character'))
 
 plink.genotype <- plink.genotype[order(row.names(plink.genotype)),]
 
@@ -88,6 +108,7 @@ all(colnames(plink.genotype)==names(genotype.data))
 
 for (i in 1:nrow(genotype.data)) {
     print(c(row.names(plink.genotype)[i], row.names(genotype.data)[i]))
+    print(snp.info[row.names(plink.genotype)[i],])
     print(table(unlist(plink.genotype[i,]), unlist(genotype.data[i,])))
 }
 
