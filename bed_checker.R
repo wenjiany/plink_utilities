@@ -24,8 +24,8 @@ bim.file <- gsub('.bed$', '.bim', bed.file)
 
 cat("\n\n")
 cat(paste0("Genotype file is :", genotype.file, "\n"))
-cat(paste0("Bed file is :", bed.file, "\n"))
-cat(paste0("Bim file is :", bim.file, "\n"))
+cat(paste0("Bed file is: ", bed.file, "\n"))
+cat(paste0("Bim file is: ", bim.file, "\n"))
 
 if (verbose) {
     cat("Continue (Y/N)? ")
@@ -40,7 +40,7 @@ snp.info <- fread(bim.file)
 setnames(snp.info, c('chr', 'snpid', 'cm', 'pos', 'allele1', 'allele2'))
 setkey(snp.info, snpid)
 
-cat("\n\nRandomly select 20 SNPs to check.\n")
+## cat("\n\nRandomly select 20 SNPs to check.\n")
 
 n.skip <- 0
 tmp.file <- file(genotype.file)
@@ -72,7 +72,7 @@ title.offset <- (sum(nchar(names(genotype.data))) + ncol(genotype.data))
 row.size <- sum(nchar(unlist(genotype.data[1,]))) + ncol(genotype.data)
 
 genotype.filesize <- file.info(genotype.file)$size[1]
-sample.pos <- sample(title.offset:(genotype.filesize-row.size*2), 20)
+sample.pos <- sample(title.offset:(genotype.filesize-row.size*2), 25)
 
 genotype.bf <- file(genotype.file, 'rb')
 
@@ -90,7 +90,11 @@ close(genotype.bf)
 row.names(genotype.data) <- genotype.data[,1]
 genotype.data <- genotype.data[,-1]
 
+genotype.data <- subset(genotype.data, row.names(genotype.data) %in% snp.info$snpid)
+
 genotype.data <- genotype.data[order(row.names(genotype.data)),]
+
+cat(paste0("Selected ", nrow(genotype.data), " SNPs for checking.\n\n"))
 
 cat("Retrieving data from plink bed file...\n")
 
