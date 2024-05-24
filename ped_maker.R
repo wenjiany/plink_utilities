@@ -1,24 +1,28 @@
 
 library(data.table)
 
-verbose <- TRUE
-
-args.orig <- commandArgs(trailingOnly=TRUE)
-
-if ('--noprompt' %in% args.orig) {
-    verbose <- FALSE
-    args.orig <- setdiff(args.orig, '--noprompt')
+if (!exists("genotype.file") || !exists("map.file")) {
+    
+  args.orig <- commandArgs(trailingOnly=TRUE)
+  
+  if ('--noprompt' %in% args.orig) {
+      verbose <- FALSE
+      args.orig <- setdiff(args.orig, '--noprompt')
+  }
+  
+  if (length(args.orig) != 2) {
+      stop("Usage: Rscript ped_maker.R genotype.file map.file")
+  }
+  
+  genotype.file <- args.orig[1]
+  map.file <- args.orig[2]
+  
 }
 
-if (length(args.orig) != 2) {
-    stop("Usage: Rscript ped_maker.R genotype.file map.file")
-}
-
-genotype.file <- args.orig[1]
-map.file <- args.orig[2]
+if (!exists("verbose")) {verbose <- TRUE}
 
 cat(paste0("Genotype file is: ", genotype.file, "\n"))
-cat(paste0("Map file is: ", map.file, ".bed\n"))
+cat(paste0("Map file is: ", map.file, "\n"))
 
 if (verbose) {
     cat("Continue (Y/N)? ")
@@ -42,6 +46,8 @@ if (file.exists(ped.file)) {
         }
     }
 }
+
+cat("Reading map file...\n")
 
 map.data <- fread(map.file, stringsAsFactors=FALSE, header=FALSE)
 
@@ -73,6 +79,11 @@ genotype.colnames <- scan(genotype.file, what='character', nline=1, quiet=TRUE, 
 
 if (ncol(genotype.data)==(length(genotype.colnames))) {
     setnames(genotype.data, genotype.colnames)
+    ### for illumina data
+    if (genotype.colnames[2]=='Name') {
+      genotype.data <- genotype.data[, -1, with=FALSE]
+      genotype.colnames <- names(genotype.data)
+    }
     setnames(genotype.data, genotype.colnames[1], 'snpid')
 } else {
     if (ncol(genotype.data)==(length(genotype.colnames)+1)) {
@@ -148,14 +159,16 @@ map.file <- gsub('.ped$', '.map', ped.file)
 cat("\nWrite map file to ", map.file, "\n")
 write.table(map.data[, 1:4, with=FALSE], file=map.file, sep=" ", quote=FALSE, col.names=FALSE, row.names=FALSE)
 
+plink_filename <- gsub('.txt$', '', basenames(genotype.file))
+
 cat("1) generate bed file\n")
-cat(paste0("plink --noweb --no-pheno --file ", genotype.file, " --out b_", genotype.file, " --make-bed --missing-genotype N\n"))
+cat(paste0("plink --noweb --no-pheno --file ", plink_filename, " --out ", plink_filename, " --make-bed --missing-genotype N\n"))
 
 cat("2) check consistency between bed file and original text file\n")
-cat(paste0("Rscript bed_checker.R ", genotype.file, " b_", genotype.file, "\n"))
+cat(paste0("Rscript bed_checker.R ", genotype.file, " ", plink_filename, "\n"))
 
 cat("3) basic SNP level summaries using bed\n")
-cat(paste0("plink --noweb --bfile b_", genotype.file, " --freq \n\n"))    
+cat(paste0("plink --noweb --bfile ", plink_filename, " --freq \n\n"))
 
-q()
+## q()
 
