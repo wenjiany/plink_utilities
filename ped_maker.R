@@ -162,13 +162,13 @@ write.table(map.data[, 1:4, with=FALSE], file=map.file, sep=" ", quote=FALSE, co
 plink_filename <- gsub('.txt$', '', basenames(genotype.file))
 
 cat("1) generate bed file\n")
-cat(paste0("plink --noweb --no-pheno --file ", plink_filename, " --out ", plink_filename, " --make-bed --missing-genotype N\n"))
+cat(paste0("plink --no-pheno --file ", plink_filename, " --out ", plink_filename, " --make-bed --missing-genotype N\n"))
 
 cat("2) check consistency between bed file and original text file\n")
 cat(paste0("Rscript bed_checker.R ", genotype.file, " ", plink_filename, "\n"))
 
 cat("3) basic SNP level summaries using bed\n")
-cat(paste0("plink --noweb --bfile ", plink_filename, " --freq \n\n"))
+cat(paste0("plink --bfile ", plink_filename, " --freq \n\n"))
 
 ## q()
 
